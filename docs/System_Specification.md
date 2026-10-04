@@ -185,6 +185,22 @@ $$
 v = \frac{d}{|\Delta t|}
 $$
 
+### 2.5 Road Surface Frost and Black Ice Formation Model
+When roadside surface temperature drops near freezing and air humidity is high, moisture condenses and freezes onto the pavement, forming dangerous black ice.
+The dew point temperature is estimated from SHT31 air temperature and relative humidity:
+$$
+T_{\text{dew}} \approx T_{\text{SHT31}} - \frac{100 - RH}{5}
+$$
+The system trips a Frost and Black Ice Alarm under the condition:
+$$
+T_{\text{LM35}} \le 3^\circ\text{C}
+$$
+With noise-immune hysteresis recovery:
+$$
+T_{\text{LM35}} \ge 6^\circ\text{C}
+$$
+Under active frost conditions, streetlights S1, S2, and S3 are driven to 100% full illumination, the active buzzer chirps, and the RGB status beacon activates Red.
+
 ---
 
 ## 3. Communication Protocol Frame Structures
@@ -192,7 +208,7 @@ $$
 ### 3.1 Bluetooth ASCII Telemetry Frame
 Broadcast every 500 ms over USART1:
 ```text
-[NODE1] T_LM:32C T_SHT:32.4C H:68% LUX:45lx DIR:FWD S1:100% S2:100% S3:50% STAT:ADAPT
+[NODE1] T_LM:2C T_SHT:2.8C H:82% LUX:12lx DIR:IDLE S1:100% S2:100% S3:100% STAT:FROST
 ```
 
 ### 3.2 RS-485 Inter-Node Network Packet
