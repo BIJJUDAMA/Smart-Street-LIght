@@ -12,7 +12,7 @@
 ### 1.1 Problem Statement
 Municipal street lighting networks consume up to 40% of a city electrical budget. Conventional street lighting systems suffer from three fundamental inefficiencies:
 1. **Static Inflexible Power Dissipation:** Luminaires remain energized at 100% power throughout the night regardless of actual traffic presence, wasting massive amounts of electrical energy during low-traffic early morning hours.
-2. **Absence of Environmental Context:** Streetlights do not adapt to adverse environmental conditions such as dense fog, high humidity, rainfall, or roadside surface overheating, compromising road safety.
+2. **Absence of Environmental Context:** Streetlights do not adapt to adverse environmental conditions such as dense fog, high humidity, freezing road temperatures, or invisible black ice formation, compromising road safety.
 3. **Isolated Silos Without Predictive Coordination:** Traditional poles operate independently. When a vehicle approaches, adjacent downstream streetlights cannot anticipate its arrival, preventing smooth illumination corridors from forming.
 
 ### 1.2 Proposed Engineering Solution
@@ -164,7 +164,23 @@ $$
 v_{\text{est}} = \frac{d}{|\Delta t|}
 $$
 
-### 4.6 Electrical Energy Savings Mathematical Model
+### 4.6 Psychrometric Dew Point and Road Surface Frost Hazard Model
+When ambient temperature plummets and humidity remains high, moisture condenses on cold asphalt and crystallizes into dangerous, low-traction black ice.
+The dew point temperature is calculated from SHT31 air temperature and relative humidity:
+$$
+T_{\text{dew}} \approx T_{\text{SHT31}} - \frac{100 - RH}{5}
+$$
+The system asserts an active Frost and Black Ice Alarm under the condition:
+$$
+T_{\text{LM35}} \le 3^\circ\text{C}
+$$
+With noise-immune hysteresis reset:
+$$
+T_{\text{LM35}} \ge 6^\circ\text{C}
+$$
+When active, streetlights ramp to 100% full illumination to maximize driver visibility on icy pavement, the active buzzer sounds, and the RGB beacon flashes Red.
+
+### 4.7 Electrical Energy Savings Mathematical Model
 In conventional municipal installations, streetlights operate at 100% power throughout the 12-hour night period:
 $$
 E_{\text{conventional}} = N \times P_{\text{lamp}} \times T_{\text{night}}
@@ -212,7 +228,7 @@ S1: 20% ──── S2: 20% ──── S3: 20%
 | **Night Adverse** | $< 30\text{ lx}$ | $\ge 80\%$ | None | 50% | 50% | 50% | Yellow | OFF |
 | **Corridor Forward** | $< 30\text{ lx}$ | Any | PIR-A $\to$ PIR-B | 100% | 100% | 50% | Blue | Chirp |
 | **Corridor Reverse** | $< 30\text{ lx}$ | Any | PIR-B $\to$ PIR-A | 50% | 100% | 100% | Blue | Chirp |
-| **Thermal Hazard** | Any | Any | Any | Hold | Hold | Hold | Red Blinking | Active |
+| **Frost / Ice Hazard** | Any | Low Temp ($\le 3^\circ\text{C}$) | Any | 100% | 100% | 100% | Red Warning | Active |
 | **Technician Manual** | Any | Any | Buttons / BT | User% | User% | User% | Magenta | OFF |
 
 ---
@@ -231,5 +247,5 @@ The system was evaluated against five rigorous laboratory scenarios:
 1. **Day to Night Transition Test:** Lux drop below 30 Lux automatically engages 20% idle baseline across S1, S2, and S3.
 2. **Adverse Weather Trigger Test:** Introducing localized humidity above 80% dynamically elevated idle power to 50% to improve safety.
 3. **Forward Moving Corridor Verification:** Triggering PIR-A followed by PIR-B launched the forward predictive wave, pre-lighting S3 before decaying back to idle.
-4. **Thermal Over-Temperature Protection:** Applying heat to LM35 above 40 °C successfully activated the Red RGB beacon and active buzzer alarm.
+4. **Frost and Black Ice Protection:** Cooling LM35 below 3 °C (cross-referenced with high humidity) successfully tripped the frost alert, illuminating all streetlights to 100% for winter road safety, triggering the Red RGB beacon, and sounding the buzzer alarm.
 5. **Technician Command Latency:** Single-byte Bluetooth and RS-485 overrides executed within 1 millisecond via NVIC interrupt.
