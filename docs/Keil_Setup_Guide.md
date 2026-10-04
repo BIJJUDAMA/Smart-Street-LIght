@@ -114,14 +114,14 @@ In the software components window, select strictly minimal bare-metal components
    - The decision engine automatically boosts the idle baseline across all streetlights from 20% to 50% for fog/rain visibility.
    - RGB status LED switches to Yellow.
 
-4. **Thermal Roadside Hazard Alarm:**
-   - Warm the LM35 sensor slightly until the reading exceeds 40 °C.
-   - The active buzzer sounds an alert, and the RGB status LED flashes Red.
+4. **Frost and Black Ice Hazard Alarm:**
+   - Apply cold ice or a cooling element to the LM35 sensor until the temperature drops to 3 °C or lower.
+   - The system detects the roadside freezing hazard, triggers a warning chirp on the active buzzer, switches the RGB status LED to Red, and elevates streetlight illumination across all nodes to 100% for driver safety.
 
 5. **Technician Serial Command Terminal:**
    - Connect via Bluetooth terminal at 9600 Baud (8-N-1) to view real-time telemetry frames:
      ```text
-     [NODE1] T_LM:31C T_SHT:31.4C H:65% LUX:18lx DIR:FWD S1:100% S2:100% S3:50% STAT:ADAPT
+     [NODE1] T_LM:2C T_SHT:2.8C H:82% LUX:18lx DIR:FWD S1:100% S2:100% S3:100% STAT:FROST
      ```
    - Send single-byte wireless commands:
      - `'F'` -> Simulates forward vehicle corridor transit.
