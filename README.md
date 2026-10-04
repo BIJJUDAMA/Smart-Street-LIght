@@ -1,6 +1,6 @@
 <div align="center">
 
-# STM32-Based Predictive Adaptive Smart Streetlight & Environmental Monitoring Network
+# STM32-Based Predictive Adaptive Smart Streetlight & Environmental Monitoring System
 
 [![Microcontroller](https://img.shields.io/badge/MCU-STM32F401CCU6%20%28Black%20Pill%29-blue.svg)](https://www.st.com/en/microcontrollers-microprocessors/stm32f401cc.html)
 [![Architecture](https://img.shields.io/badge/Architecture-ARM%20Cortex--M4%20w%2F%20FPU-brightgreen.svg)]()
@@ -8,74 +8,79 @@
 [![Firmware](https://img.shields.io/badge/Firmware-Bare--Metal%20CMSIS%20Register-brightgreen.svg)]()
 
 <p align="center">
-  <b>An intelligent, energy-saving municipal streetlight network and environmental monitoring unit built on a single STM32F401CCU6 Black Pill simulating a distributed 3-node moving illumination corridor.</b>
+  <b>An intelligent, energy-saving municipal streetlight controller and environmental monitoring system built on a single STM32F401CCU6 Black Pill simulating a predictive 3-zone moving illumination corridor.</b>
 </p>
 
 </div>
 
 ---
 
-The system reduces municipal electrical grid power draw by up to 70% by automating streetlight intensity with real-time ambient optical sensing, vector motion tracking, and weather-aware policy adaptation. A single STM32F401CCU6 microcontroller controls three independent PWM-dimmed streetlights (S1, S2, S3) to simulate a multi-pole road corridor, continuously measuring ambient microclimate parameters and streaming live telemetry over RS-485 and Bluetooth.
+The system optimizes municipal street lighting energy consumption by combining real-time environmental context with vector presence tracking. A single STM32F401CCU6 microcontroller drives three independent 1.0 kHz PWM channels (S1, S2, S3) to simulate a multi-zone roadway corridor, adjusting illumination baselines and hold durations based on psychrometric dew point calculations while streaming telemetry over Bluetooth.
 
 ---
 
 ## Key Features
 
-- **Autonomous Predictive Illumination Corridor:** Uses dual PIR sensors (PIR-A and PIR-B) to calculate motion direction (forward vs reverse) and vehicle transit speed, illuminating ahead of vehicles to create a smooth travelling light corridor before fading back to idle.
-- **Context-Aware Environmental Adaptation:** Ambient sensors determine the lighting baseline, while motion dictates instantaneous demand:
+- **Predictive Moving Illumination Corridor:** Uses dual EXTI-timestamped PIR sensors (PIR-A and PIR-B) to determine direction vectors (forward vs reverse), pre-lighting upcoming streetlights and fading trailing lights as road users clear each zone.
+- **Context-Aware Environmental Adaptation:** Environmental sensors establish the baseline policy while motion supplies instantaneous demand:
   - *Daylight:* Luminaires extinguished (0%).
-  - *Clear Night:* Base idle brightness maintained at 20% to save energy.
-  - *Adverse Weather (High Humidity / Rain / Fog):* Base idle automatically elevated to 50% for driver safety.
-  - *Active Transit:* Approach streetlights ramp to 100%, and downstream nodes pre-light to 50%.
-- **Dual-Technology Sensor Redundancy:**
-  - *Temperature:* Analog LM35 (road surface temperature) cross-referenced with digital SHT31 (ambient air temperature and relative humidity).
-  - *Optical:* Analog LDR (fast twilight thresholding) paired with digital BH1750 (calibrated photometric lux).
-- **Multi-Channel Hardware PWM Dimming:** Drives three independent low-side MOSFET streetlight channels using Timer 2 (`TIM2_CH1`) and Timer 3 (`TIM3_CH1`, `TIM3_CH2`) at 190.5 Hz for smooth, non-flickering dimming.
-- **Multi-Device I2C Shared Bus:** Connects digital SHT31, BH1750, and 16x2 character LCD over a single bare-metal I2C master bus (`PB8`/`PB9`).
-- **Distributed Network Simulation:** Includes MAX485 transceiver for inter-pole RS-485 communication alongside an HC-05 Bluetooth module for mobile technician diagnostics.
-- **Field Safety and Hazard Watchdog:** Features an RGB status beacon, active buzzer hazard alarms, and tactile pushbuttons with non-blocking software debounce for manual brightness overrides.
+  - *Clear Night:* Base idle brightness maintained at 8% perceptual (20% PWM) to minimize power draw.
+  - *Surface Moisture / Fog Risk:* Baseline dynamically elevated to 25% perceptual (50% PWM) with longer pre-lighting and hold times.
+  - *Frost & Black Ice Hazard:* Road surface temperature ($\le 3^\circ\text{C}$) paired with psychrometric dew point triggers hazard alerts and maximum pre-lighting.
+- **Psychrometric Dew Point Engine:** Computes real-time air dew points using the Magnus formula via hardware floating-point operations.
+- **Closed-Loop Optical Feedback:** LDR on `PA4` monitors Streetlight S2 output inside an optical tube to detect luminaire driver faults.
+- **1.0 kHz Hardware PWM with Gamma 2.2 Correction:** Drives three independent low-side MOSFET channels using `TIM2_CH3` (`PA2`), `TIM3_CH1` (`PA6`), and `TIM3_CH2` (`PA7`) with asymmetric slew rates for flicker-free dimming.
+- **Non-Blocking Architecture:** Operates with zero busy-wait delays, featuring an EXTI interrupt event layer, SysTick cooperative scheduler, and I2C timeout protection.
 
 ---
 
 ## System Architecture
 
 ```text
-                                  ENVIRONMENT CONTEXT
+                                  ENVIRONMENTAL CONTEXT
                    ┌──────────────┬──────────────────┬──────────────┐
                    │              │                  │              │
-                 LM35            LDR               SHT31          BH1750
-             (Analog Temp)  (Analog Light)     (Digital Hum)  (Digital Lux)
+                 BH1750         SHT31              LM35            LDR
+             (Ambient Lux)  (Air Temp+RH)      (Surface Temp)  (S2 Feedback)
                    │              │                  │              │
-                   └──────────────┴────────┬─────────┴──────────────┘
-                                           │
-PIR-A (Approach) ───┐                      ▼
-                    ├──────────────> ┌───────────┐
-PIR-B (Direction) ──┘   (Demand)     │ STM32F401 │
-                                     │ DECISION  │
-Technician Buttons / Bluetooth ────> │  ENGINE   │
-                                     └─────┬─────┘
-                                           │
-                   ┌───────────────────────┼───────────────────────┐
-                   ▼                       ▼                       ▼
-            3-CHANNEL PWM             RS-485 BUS                16x2 LCD
-             STREETLIGHTS          INTER-POLE COORD          RGB STATUS &
-              (S1, S2, S3)          + BLUETOOTH                 BUZZER
+                   └──────────────┼──────────────────┴──────────────┘
+                                  │
+PIR-A (Zone 1) ──┐                ▼
+                 ├──(EXTI)──> ┌───────────┐
+PIR-B (Zone 3) ──┘            │ STM32F401 │
+                              │ DECISION  │
+Onboard Button (Mode) ──────> │  ENGINE   │
+                              └─────┬─────┘
+                                    │
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
+  3-CHANNEL 1kHz PWM           16x2 I2C LCD                BLUETOOTH
+   STREETLIGHTS                 DASHBOARD                  TELEMETRY
+  (S1, S2, S3)                                            & COMMANDS
 ```
 
-### Moving Illumination Corridor Progression
+### Moving Illumination Corridor Progression (Forward Pass)
 
 ```text
-Idle Corridor (Clear Night):
-  S1: 20% ──────────── S2: 20% ──────────── S3: 20%
+T0 (Idle Baseline):
+  S1: [====                ] 20%
+  S2: [====                ] 20%
+  S3: [====                ] 20%
 
-Vehicle Approach Detected Moving Forward (PIR-A -> PIR-B):
-  S1: 100% ─────────── S2: 100% ─────────── S3: 50% (Pre-lit)
+T1 (PIR-A Triggers - Vehicle Entering Zone 1):
+  S1: [====================] 100% (Active zone)
+  S2: [====================] 100% (Predicted zone)
+  S3: [==========          ] 50%  (Pre-lit zone)
 
-Vehicle Advances Through Mid-Corridor:
-  S1: 20% (Decay) ──── S2: 100% ─────────── S3: 100%
+T2 (PIR-B Triggers - Vehicle Entering Zone 2):
+  S1: [====                ] 20%  (Decays behind vehicle)
+  S2: [====================] 100% (Active zone)
+  S3: [====================] 100% (Upcoming zone)
 
-Corridor Reset:
-  S1: 20% ──────────── S2: 20% ──────────── S3: 20%
+T3 (Restored Baseline after Hold Time):
+  S1: [====                ] 20%
+  S2: [====                ] 20%
+  S3: [====                ] 20%
 ```
 
 ---
@@ -84,24 +89,23 @@ Corridor Reset:
 
 | Item | Component Description | Quantity | Target Pin / Bus | Purpose |
 | :---: | :--- | :---: | :--- | :--- |
-| **1** | **STM32F401CCU6 Black Pill** | 1 | Microcontroller Core | 84 MHz ARM Cortex-M4 MCU Board |
+| **1** | **STM32F401CCU6 Black Pill** | 1 | Microcontroller Core | 16 MHz ARM Cortex-M4 MCU Board |
 | **2** | **ST-Link V2 Programmer** | 1 | SWD (SWDIO, SWCLK) | Firmware flashing and in-circuit debugging |
-| **3** | **HC-SR501 PIR Motion Sensors** | 2 | `PB0` (PIR-A), `PB1` (PIR-B) | Approach and direction detection |
-| **4** | **LDR Photocell Module** | 1 | `PA4` (ADC1_IN4) | Analog day/night twilight sensing |
-| **5** | **BH1750 Lux Sensor (GY-302)** | 1 | `PB8` (SCL), `PB9` (SDA) | Calibrated ambient illumination (Lux) |
-| **6** | **LM35 Precision Temp Sensor** | 1 | `PA1` (ADC1_IN1) | Analog road surface temperature (10 mV/°C) |
-| **7** | **SHT31-D Temp & Humidity** | 1 | `PB8` (SCL), `PB9` (SDA) | Microclimate and fog/rain monitoring |
+| **3** | **HC-SR501 PIR Sensors** | 2 | `PB0` (PIR-A), `PB1` (PIR-B) | Presence and direction detection (with tubes) |
+| **4** | **BH1750 Lux Sensor (GY-302)** | 1 | `PB8` (SCL), `PB9` (SDA) | Calibrated ambient illumination (Lux) |
+| **5** | **LM35 Precision Temp Sensor** | 1 | `PA1` (ADC1_IN1) | Pavement surface temperature probe (5V supply) |
+| **6** | **SHT31-D Temp & Humidity** | 1 | `PB8` (SCL), `PB9` (SDA) | Ambient microclimate and psychrometric dew point |
+| **7** | **LDR Photocell Module** | 1 | `PA4` (ADC1_IN4) | Streetlight 2 optical feedback verification |
 | **8** | **16x2 I2C LCD Display** | 1 | `PB8` (SCL), `PB9` (SDA) | Real-time state and telemetry dashboard |
-| **9** | **Bright White LEDs** | 3 | `PA0`, `PA6`, `PA7` | Physical streetlights (S1, S2, S3) |
+| **9** | **Bright White LEDs** | 3 | `PA2`, `PA6`, `PA7` | Physical streetlights (S1, S2, S3) |
 | **10** | **Logic N-MOSFETs (or Driver)**| 3 | S1, S2, S3 PWM gates | Low-side LED switching switches |
 | **11** | **RGB Status LED** | 1 | `PB13` (R), `PB14` (G), `PB15` (B)| Multi-color operating state indicator |
-| **12** | **Active Buzzer** | 1 | `PB12` | High-temperature and intruder alarm |
-| **13** | **Pushbuttons (Tactile)** | 2 | `PA5` (UP), `PA8` (DOWN) | Manual brightness override |
-| **14** | **MAX485 Module** | 1 | `PA2` (TX), `PA3` (RX), `PB10` (DE)| Inter-node RS-485 bus simulation |
-| **15** | **HC-05 Bluetooth Module** | 1 | `PA9` (TX), `PA10` (RX) | Wireless technician diagnostic console |
-| **16** | **Resistors (220 Ω, 330 Ω, 10 kΩ)**| Assorted | Current limit & pull-ups | Circuit protection and signal conditioning |
-| **17** | **Solderless Breadboard** | 1-2 | Circuit Platform | Component mounting and breadboarding |
-| **18** | **Jumper Wires (M-M, M-F, F-F)** | 40+ | Interconnects | Breadboard signal routing |
+| **12** | **Active Buzzer** | 1 | `PB12` | Single-pulse audible state annunciator |
+| **13** | **Pushbuttons (Tactile)** | 2 | `PA5` (UP), `PA8` (DOWN) | Manual brightness override (+5% / -5%) |
+| **14** | **HC-05 Bluetooth Module** | 1 | `PA9` (TX), `PA10` (RX) | Wireless technician diagnostic console |
+| **15** | **Resistors (220 Ω, 330 Ω, 10 kΩ)**| Assorted | Current limit & pull-ups | Circuit protection and signal conditioning |
+| **16** | **Solderless Breadboard** | 1-2 | Circuit Platform | Component mounting and prototyping |
+| **17** | **Jumper Wires (M-M, M-F, F-F)** | 40+ | Interconnects | Breadboard signal routing |
 
 ---
 
@@ -109,125 +113,81 @@ Corridor Reset:
 
 | Signal / Function | MCU Pin | Peripheral | Mode | Hardware Destination |
 | :--- | :--- | :--- | :--- | :--- |
-| **`S1_PWM`** | `PA0` | TIM2_CH1 | AF Push-Pull (AF1) | Streetlight 1 LED PWM Dimmer |
-| **`S2_PWM`** | `PA6` | TIM3_CH1 | AF Push-Pull (AF2) | Streetlight 2 LED PWM Dimmer |
-| **`S3_PWM`** | `PA7` | TIM3_CH2 | AF Push-Pull (AF2) | Streetlight 3 LED PWM Dimmer |
-| **`LM35_TEMP`** | `PA1` | ADC1_IN1 | Analog Input | LM35 Temperature Sensor |
-| **`LDR_LIGHT`** | `PA4` | ADC1_IN4 | Analog Input | LDR Photocell Voltage Divider |
-| **`RS485_TX`** | `PA2` | USART2_TX | AF Push-Pull (AF7) | MAX485 Driver Input (DI) |
-| **`RS485_RX`** | `PA3` | USART2_RX | AF Push-Pull (AF7) | MAX485 Receiver Output (RO) |
-| **`RS485_DE`** | `PB10` | GPIO Out | Digital Output | MAX485 DE & RE Enable Line |
+| **`MODE_BTN`** | `PA0` | GPIO In | Input w/ Pull-up | Onboard KEY Button (Auto/Manual) |
+| **`LM35_TEMP`** | `PA1` | ADC1_IN1 | Analog Input | LM35 Pavement Surface Probe |
+| **`S1_PWM`** | `PA2` | TIM2_CH3 | AF Push-Pull (AF1) | Streetlight 1 1.0 kHz PWM Dimmer |
+| **`LDR_FB`** | `PA4` | ADC1_IN4 | Analog Input | S2 Optical Output Feedback |
+| **`BTN_UP`** | `PA5` | GPIO In | Input w/ Pull-up | Manual Step Up (+5%) |
+| **`S2_PWM`** | `PA6` | TIM3_CH1 | AF Push-Pull (AF2) | Streetlight 2 1.0 kHz PWM Dimmer |
+| **`S3_PWM`** | `PA7` | TIM3_CH2 | AF Push-Pull (AF2) | Streetlight 3 1.0 kHz PWM Dimmer |
+| **`BTN_DOWN`** | `PA8` | GPIO In | Input w/ Pull-up | Manual Step Down (-5%) |
 | **`BT_TX`** | `PA9` | USART1_TX | AF Push-Pull (AF7) | HC-05 Bluetooth Telemetry TX |
 | **`BT_RX`** | `PA10` | USART1_RX | AF Push-Pull (AF7) | HC-05 Bluetooth Command RX |
-| **`PIR_A`** | `PB0` | GPIO In | Digital Input w/ Pull-down | Motion Sensor A (Approach) |
-| **`PIR_B`** | `PB1` | GPIO In | Digital Input w/ Pull-down | Motion Sensor B (Direction) |
+| **`PIR_A`** | `PB0` | EXTI0 | Interrupt In | Motion Presence Sensor A (Zone 1) |
+| **`PIR_B`** | `PB1` | EXTI1 | Interrupt In | Motion Presence Sensor B (Zone 3) |
 | **`I2C1_SCL`** | `PB8` | I2C1_SCL | Open-Drain AF (AF4) | SHT31, BH1750, LCD SCL |
 | **`I2C1_SDA`** | `PB9` | I2C1_SDA | Open-Drain AF (AF4) | SHT31, BH1750, LCD SDA |
 | **`BUZZER`** | `PB12` | GPIO Out | Digital Output | Active Audible Hazard Alarm |
 | **`RGB_RED`** | `PB13` | GPIO Out | Digital Output | RGB Hazard Warning Channel |
 | **`RGB_GRN`** | `PB14` | GPIO Out | Digital Output | RGB Normal Operation Channel |
 | **`RGB_BLU`** | `PB15` | GPIO Out | Digital Output | RGB Corridor Active Channel |
-| **`BTN_UP`** | `PA5` | GPIO In | Input w/ Pull-up | Manual Brightness Step Up (+5%) |
-| **`BTN_DOWN`** | `PA8` | GPIO In | Input w/ Pull-up | Manual Brightness Step Down (-5%) |
-| **`SYS_LED`** | `PC13` | GPIO Out | Digital Output | Onboard Heartbeat LED |
+| **`SYS_LED`** | `PC13` | GPIO Out | Digital Output | Onboard 1 Hz Heartbeat LED |
 
 ---
 
 ## Mathematical Formulations
 
-### 1. LM35 Temperature Sensor Calculation
-The LM35 produces an analog output of 10 mV/°C relative to the 3.3V reference:
+### 1. LM35 Temperature Sensor with 16x Oversampling
 $$
-\text{Temperature (LM35)} = \frac{\text{ADC}_{\text{raw}} \times 3.3\text{ V}}{4095 \times 0.010\text{ V}/^\circ\text{C}} = \frac{\text{ADC}_{\text{raw}} \times 330}{4095}
-$$
-
-### 2. BH1750 Ambient Light Calculation
-The BH1750 internal ADC integrates photometric flux density into calibrated Lux:
-$$
-\text{Illuminance (Lux)} = \frac{\text{Code}_{\text{raw}}}{1.2}
+\text{Temperature (LM35)} = \frac{\text{ADC}_{\text{avg}} \times 3.3\text{ V}}{4095 \times 0.010\text{ V}/^\circ\text{C}} = \frac{\text{ADC}_{\text{avg}} \times 330}{4095}
 $$
 
-### 3. SHT31 Temperature and Humidity Calculations
+### 2. SHT31 Dew Point Calculation (Magnus Formula)
 $$
-\text{Temperature (SHT31)} = -45 + 175 \times \frac{S_T}{65535}
+\gamma(T_{\text{air}}, RH) = \frac{17.62 \times T_{\text{air}}}{243.12 + T_{\text{air}}} + \ln\left(\frac{RH}{100}\right)
 $$
 $$
-\text{Relative Humidity (\%RH)} = 100 \times \frac{S_{RH}}{65535}
-$$
-
-### 4. PWM Dimmer Frequency Calculation
-Operating on TIM2 and TIM3 with a 16 MHz core clock, prescaler PSC = 83, and auto-reload ARR = 999:
-$$
-f_{\text{PWM}} = \frac{f_{\text{CLK}}}{(\text{PSC} + 1) \times (\text{ARR} + 1)} = \frac{16{,}000{,}000}{84 \times 1000} = 190.48\text{ Hz}
+T_{\text{dew}} = \frac{243.12 \times \gamma}{17.62 - \gamma}
 $$
 
-### 5. Motion Direction and Speed Estimation
-Given sensor physical separation distance d and trigger time difference $\Delta t$:
+### 3. 1.0 kHz PWM Carrier Formulation
+Operating on TIM2 and TIM3 with a 16 MHz internal HSI core clock, prescaler PSC = 15, and auto-reload ARR = 999:
 $$
-\Delta t = t_{\text{PIR\_B}} - t_{\text{PIR\_A}}
-$$
-$$
-v = \frac{d}{|\Delta t|}
+f_{\text{PWM}} = \frac{f_{\text{CLK}}}{(\text{PSC} + 1) \times (\text{ARR} + 1)} = \frac{16{,}000{,}000}{16 \times 1000} = 1000\text{ Hz}
 $$
 
-### 6. Psychrometric Dew Point and Frost Formation
-When road surface temperature drops near freezing and relative humidity is high, surface frost and black ice form on the road:
+### 4. Perceptual Gamma 2.2 Slew Transformation
 $$
-T_{\text{dew}} \approx T_{\text{SHT31}} - \frac{100 - RH}{5}
+\text{CCR} = 1000 \times \left( \frac{\text{Level}_{\text{perceptual}}}{1000} \right)^{2.2}
 $$
-The system detects frost and black ice risk when $T_{\text{LM35}} \le 3^\circ\text{C}$ (with hysteresis reset at $T_{\text{LM35}} \ge 6^\circ\text{C}$), automatically driving all streetlights to 100% for driver safety.
 
 ---
 
 ## Lighting Decision Engine Policy
 
-| Condition | Ambient Lux | Humidity / Temp | Motion Event | S1 | S2 | S3 | RGB Status |
-| :--- | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
-| **Daylight** | > 50 lx | Any | Don't Care | 0% | 0% | 0% | Solid Green |
-| **Night Normal** | < 30 lx | < 80% RH | None | 20% | 20% | 20% | Dim Green |
-| **Night Adverse** | < 30 lx | >= 80% RH | None | 50% | 50% | 50% | Yellow |
-| **Vehicle Transit (Forward)** | < 30 lx | Normal Temp | PIR-A -> PIR-B | 100% | 100% | 50% | Blue |
-| **Vehicle Transit (Reverse)** | < 30 lx | Normal Temp | PIR-B -> PIR-A | 50% | 100% | 100% | Blue |
-| **Frost / Ice Hazard** | Any | Road Temp <= 3 °C | Any | 100% | 100% | 100% | Red Blinking + Buzzer |
-| **Manual Override** | Any | Any | Buttons / BT | User% | User% | User% | Magenta |
+| Policy Profile | Ambient Lux | Surface / Dew Point Context | S1 Level | S2 Level | S3 Level | RGB Status |
+| :--- | :--- | :--- | :---: | :---: | :---: | :--- |
+| **`DAYLIGHT`** | $> 50\text{ lx}$ | Any | 0% (OFF) | 0% (OFF) | 0% (OFF) | Solid Green |
+| **`NORMAL`** | $< 20\text{ lx}$ | $T_{\text{air}} - T_{\text{dew}} > 3.5^\circ\text{C}$ | 8% (Idle) | 8% (Idle) | 8% (Idle) | Solid Green |
+| **`WET_RISK`** | $< 20\text{ lx}$ | $T_{\text{air}} - T_{\text{dew}} \le 2.0^\circ\text{C}$ | 25% (Floor) | 25% (Floor) | 25% (Floor) | Yellow |
+| **`CORRIDOR_FWD`** | $< 20\text{ lx}$ | PIR-A $\to$ PIR-B Trigger | 100% | 100% | 60% (Pre-lit) | Blue |
+| **`CORRIDOR_REV`** | $< 20\text{ lx}$ | PIR-B $\to$ PIR-A Trigger | 60% (Pre-lit) | 100% | 100% | Blue |
+| **`FROST_RISK`** | Any | $T_{\text{surface}} \le 3^\circ\text{C} \le T_{\text{dew}}$ | 25% (Floor) | 25% (Floor) | 25% (Floor) | Red + Alert |
+| **`MANUAL`** | Any | Onboard Button / Terminal | User % | User % | User % | Magenta |
 
 ---
 
 ## Telemetry Format
 
-The unit broadcasts an updated telemetry packet every 500 ms over Bluetooth (USART1) and RS-485 (USART2):
+The unit broadcasts an updated telemetry packet every 1000 ms over Bluetooth (USART1 @ 9600 Baud):
 
 ```text
-[NODE1] T_LM:2C T_SHT:2.8C H:82% LUX:18lx DIR:FWD S1:100% S2:100% S3:100% STAT:FROST
+[N1] T_S:24C T_A:24.5C H:65% LUX:18lx DIR:FWD S1:100% S2:100% S3:50% STAT:NORMAL
 ```
 
-- **`T_LM` / `T_SHT`:** Road surface analog temp and ambient digital temp in °C.
+- **`T_S` / `T_A`:** Surface temp (LM35) and Air temp (SHT31) in °C.
 - **`H`:** Ambient relative humidity in %RH.
 - **`LUX`:** Ambient light illuminance in Lux.
-- **`DIR`:** Detected vehicle motion direction (`IDLE`, `FWD`, `REV`).
-- **`S1 / S2 / S3`:** Individual luminaire power levels.
-- **`STAT`:** Operating state (`DAY`, `ADAPT`, `POOR`, `MANUAL`, `FROST`).
-
----
-
-## Repository Structure
-
-```text
-├── src/                        # Standalone Source Code
-│   └── main.c                  # 100% self-contained bare-metal CMSIS C firmware
-└── docs/                       # Engineering Reports & Specifications
-    ├── Case_Study_Report.md    # Full academic case study & technical analysis
-    ├── Keil_Setup_Guide.md     # Step-by-step Keil uVision 5 build and wiring guide
-    └── System_Specification.md # Hardware register mapping and protocol specifications
-```
-
----
-
-## Build and Flashing Instructions
-
-1. Open **Keil uVision 5** and open or create a project targeting **STM32F401CCUx**.
-2. In Manage Run-Time Environment, select **CMSIS -> CORE** and **Device -> Startup** (No HAL required).
-3. Add [`src/main.c`](file:///C:/My-Files/College/Sem%205/EMBEDDED/casestudy/src/main.c) into your Source Group.
-4. Press **F7** to compile and build the HEX binary.
-5. Connect your **ST-LINK v2** to the STM32F401 Black Pill (`SWDIO`, `SWCLK`, `3.3V`, `GND`) and press **F8** to flash.
-6. Open any serial terminal at **9600 Baud (8-N-1)** to view real-time telemetry and send test commands (`'F'` for forward motion, `'R'` for reverse motion, `'U'`/`'D'` for manual brightness adjustment, `'A'` for auto mode).
+- **`DIR`:** Detected presence vector (`IDLE`, `FWD`, `REV`, `AMBIG`).
+- **`S1 / S2 / S3`:** Individual luminaire power percentages.
+- **`STAT`:** Policy context (`DAY`, `NORMAL`, `WET_RISK`, `FROST_RISK`, `MANUAL`).
