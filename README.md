@@ -170,19 +170,26 @@ $$
 v = \frac{d}{|\Delta t|}
 $$
 
+### 6. Psychrometric Dew Point and Frost Formation
+When road surface temperature drops near freezing and relative humidity is high, surface frost and black ice form on the road:
+$$
+T_{\text{dew}} \approx T_{\text{SHT31}} - \frac{100 - RH}{5}
+$$
+The system detects frost and black ice risk when $T_{\text{LM35}} \le 3^\circ\text{C}$ (with hysteresis reset at $T_{\text{LM35}} \ge 6^\circ\text{C}$), automatically driving all streetlights to 100% for driver safety.
+
 ---
 
 ## Lighting Decision Engine Policy
 
-| Condition | Ambient Lux | Humidity | Motion Event | S1 | S2 | S3 | RGB Status |
+| Condition | Ambient Lux | Humidity / Temp | Motion Event | S1 | S2 | S3 | RGB Status |
 | :--- | :--- | :--- | :--- | :---: | :---: | :---: | :--- |
 | **Daylight** | > 50 lx | Any | Don't Care | 0% | 0% | 0% | Solid Green |
 | **Night Normal** | < 30 lx | < 80% RH | None | 20% | 20% | 20% | Dim Green |
 | **Night Adverse** | < 30 lx | >= 80% RH | None | 50% | 50% | 50% | Yellow |
-| **Vehicle Transit (Forward)** | < 30 lx | Any | PIR-A -> PIR-B | 100% | 100% | 50% | Blue |
-| **Vehicle Transit (Reverse)** | < 30 lx | Any | PIR-B -> PIR-A | 50% | 100% | 100% | Blue |
-| **Thermal Hazard** | Any | Any | Any | Hold | Hold | Hold | Red Blinking + Buzzer |
-| **Manual Override** | Any | Any | Any | User% | User% | User% | Magenta |
+| **Vehicle Transit (Forward)** | < 30 lx | Normal Temp | PIR-A -> PIR-B | 100% | 100% | 50% | Blue |
+| **Vehicle Transit (Reverse)** | < 30 lx | Normal Temp | PIR-B -> PIR-A | 50% | 100% | 100% | Blue |
+| **Frost / Ice Hazard** | Any | Road Temp <= 3 °C | Any | 100% | 100% | 100% | Red Blinking + Buzzer |
+| **Manual Override** | Any | Any | Buttons / BT | User% | User% | User% | Magenta |
 
 ---
 
@@ -191,7 +198,7 @@ $$
 The unit broadcasts an updated telemetry packet every 500 ms over Bluetooth (USART1) and RS-485 (USART2):
 
 ```text
-[NODE1] T_LM:31C T_SHT:31.4C H:68% LUX:22lx DIR:FWD S1:100% S2:100% S3:50% STAT:ADAPT
+[NODE1] T_LM:2C T_SHT:2.8C H:82% LUX:18lx DIR:FWD S1:100% S2:100% S3:100% STAT:FROST
 ```
 
 - **`T_LM` / `T_SHT`:** Road surface analog temp and ambient digital temp in °C.
@@ -199,7 +206,7 @@ The unit broadcasts an updated telemetry packet every 500 ms over Bluetooth (USA
 - **`LUX`:** Ambient light illuminance in Lux.
 - **`DIR`:** Detected vehicle motion direction (`IDLE`, `FWD`, `REV`).
 - **`S1 / S2 / S3`:** Individual luminaire power levels.
-- **`STAT`:** Operating state (`DAY`, `ADAPT`, `POOR`, `MANUAL`, `HAZARD`).
+- **`STAT`:** Operating state (`DAY`, `ADAPT`, `POOR`, `MANUAL`, `FROST`).
 
 ---
 
