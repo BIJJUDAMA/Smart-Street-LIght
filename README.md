@@ -91,7 +91,7 @@ T3 (Restored Baseline after Hold Time):
 | :---: | :--- | :---: | :--- | :--- |
 | **1** | **STM32F401CCU6 Black Pill** | 1 | Microcontroller Core | 16 MHz ARM Cortex-M4 MCU Board |
 | **2** | **ST-Link V2 Programmer** | 1 | SWD (SWDIO, SWCLK) | Firmware flashing and in-circuit debugging |
-| **3** | **HC-SR501 PIR Sensors** | 2 | `PB0` (PIR-A), `PB1` (PIR-B) | Presence and direction detection (with tubes) |
+| **3** | **HC-SR501 PIR Sensors** | 2 | `PB0` (PIR-A), `PB1` (PIR-B) | Presence and direction detection (110° FOV collimated to 30° with paper tubes) |
 | **4** | **BH1750 Lux Sensor (GY-302)** | 1 | `PB8` (SCL), `PB9` (SDA) | Calibrated ambient illumination (Lux) |
 | **5** | **LM35 Precision Temp Sensor** | 1 | `PA1` (ADC1_IN1) | Pavement surface temperature probe (5V supply) |
 | **6** | **SHT31-D Temp & Humidity** | 1 | `PB8` (SCL), `PB9` (SDA) | Ambient microclimate and psychrometric dew point |
