@@ -80,7 +80,7 @@ In the software components window, select strictly minimal bare-metal components
 | **Heartbeat LED** | Onboard LED | `PC13` | Digital Output | Onboard active-low LED |
 
 ### 3.3 Optical Isolation & Collimation Tips
-1. **PIR Field of View:** Place a 5 cm black heat-shrink or cardboard tube around PIR-A and PIR-B domes to narrow detection cones to $30^\circ$, preventing cross-triggering.
+1. **PIR Field of View (FOV) & Collimation:** The HC-SR501 PIR sensor has a wide native conical Field of View of **110°**, which causes significant sensor overlap and false reverse triggering when two modules are placed close together on a desktop breadboard. During testing, wrap a small rolled piece of dark paper, cardboard, or 5 cm heat-shrink tubing around the Fresnel dome (or mask the sides with opaque tape) to narrow the detection cone down to approximately **30°**. This guarantees clean spatial isolation between Zone 1 (PIR-A) and Zone 3 (PIR-B).
 2. **BH1750 Shielding:** Position the BH1750 ambient sensor facing away from or shielded from Streetlights S1, S2, and S3 to prevent optical feedback oscillation.
 
 ---
