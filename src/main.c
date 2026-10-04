@@ -51,8 +51,9 @@
 #define LUX_NIGHT_THRESHOLD     30              /* Lux threshold below which streetlights activate */
 #define LUX_DAY_THRESHOLD       50              /* Lux threshold for daytime luminaire shutoff */
 #define HUMIDITY_POOR_COND      80              /* %RH threshold for adverse fog/rain condition */
-#define TEMP_HIGH_HAZARD        40              /* °C threshold for roadside thermal alarm */
-#define TEMP_HAZARD_RESET       37              /* °C threshold for thermal alarm hysteresis reset */
+#define TEMP_FROST_ALERT        3               /* °C threshold for roadside frost and black ice hazard */
+#define TEMP_FROST_RESET        6               /* °C threshold for frost alarm hysteresis reset */
+#define HUMIDITY_FROST_RISK     75              /* %RH threshold for severe black ice risk with low temp */
 
 #define DUTY_OFF                0               /* 0%   = OFF */
 #define DUTY_IDLE_NORMAL        200             /* 20%  = Normal clear night idle baseline */
@@ -67,7 +68,7 @@ typedef enum {
     STATE_CORRIDOR_FWD,
     STATE_CORRIDOR_REV,
     STATE_MANUAL,
-    STATE_HAZARD
+    STATE_FROST
 } SystemState_t;
 
 /* Motion Direction */
@@ -752,12 +753,31 @@ int main(void) {
                 sensor_humidity   = sht_hum;
             }
 
-            /* Decision Engine: Context & Demand Evaluation */
-            if (sensor_temp_lm35 >= TEMP_HIGH_HAZARD) {
-                /* Thermal Roadside Hazard Condition */
-                current_state = STATE_HAZARD;
-                Set_RGB(1, 0, 0);               /* Red Alarm */
-                Trigger_Buzzer(200);            /* Periodic hazard beep */
+            /* Decision Engine: Frost & Black Ice Evaluation */
+            uint8_t frost_active = 0;
+            if (current_state == STATE_FROST) {
+                /* Hysteresis: Stay in frost state until road temp warms above reset threshold */
+                if (sensor_temp_lm35 < TEMP_FROST_RESET) {
+                    frost_active = 1;
+                }
+            } else {
+                /* Trigger frost hazard if road temp drops <= 3°C */
+                if (sensor_temp_lm35 <= TEMP_FROST_ALERT) {
+                    frost_active = 1;
+                }
+            }
+
+            if (frost_active) {
+                current_state = STATE_FROST;
+                /* Maximize illumination for driver safety on icy roads */
+                if (auto_mode) {
+                    pwm_tgt_s1 = DUTY_FULL;
+                    pwm_tgt_s2 = DUTY_FULL;
+                    pwm_tgt_s3 = DUTY_FULL;
+                }
+                Set_RGB(1, 0, 0);               /* Red Warning Beacon for Frost Hazard */
+                Trigger_Buzzer(200);            /* Hazard warning chirp */
+                RS485_SendPacket(0xFF, 0x20, 0); /* Broadcast frost hazard across RS-485 */
             } else if (auto_mode) {
                 /* Evaluate Optical Context (Day vs Night) */
                 if (sensor_lux >= LUX_DAY_THRESHOLD) {
@@ -796,7 +816,7 @@ int main(void) {
             const char *dir_str = (current_direction == DIR_FORWARD) ? "FWD" :
                                   (current_direction == DIR_REVERSE) ? "REV" : "IDLE";
             const char *stat_str = (current_state == STATE_DAY)          ? "DAY" :
-                                   (current_state == STATE_HAZARD)       ? "HAZARD" :
+                                   (current_state == STATE_FROST)        ? "FROST" :
                                    (current_state == STATE_MANUAL)       ? "MANUAL" :
                                    (current_state == STATE_CORRIDOR_FWD) ? "CORR_F" :
                                    (current_state == STATE_CORRIDOR_REV) ? "CORR_R" : "ADAPT";
@@ -871,9 +891,13 @@ int main(void) {
             display_page = !display_page;       /* Alternate page */
 
             if (display_page == 0) {
-                /* Page 1: Environmental Metrics */
+                /* Page 1: Environmental Metrics & Frost Alert */
                 LCD_SetCursor(0, 0);
-                sprintf(lcd_buf, "T:%dC H:%.0f%%     ", (int)sensor_temp_lm35, sensor_humidity);
+                if (current_state == STATE_FROST) {
+                    sprintf(lcd_buf, "T:%dC *FROST ICE*", (int)sensor_temp_lm35);
+                } else {
+                    sprintf(lcd_buf, "T:%dC H:%.0f%%     ", (int)sensor_temp_lm35, sensor_humidity);
+                }
                 LCD_Print(lcd_buf);
 
                 LCD_SetCursor(1, 0);
