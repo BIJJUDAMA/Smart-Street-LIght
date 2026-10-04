@@ -1,99 +1,133 @@
-# Keil µVision 5 Setup & Hardware Flashing Guide (Fresh Project Workflow)
+# Keil uVision 5 Setup and Hardware Demonstration Guide
 
-This guide provides step-by-step instructions to create a **fresh Keil µVision 5 project** from scratch, add the standalone **`src/main.c`**, compile the project, and flash the **STM32F401 microcontroller**.
-
----
-
-## 1. Prerequisites
-
-1. **Keil MDK-ARM µVision 5** (v5.30 or newer).
-2. **STM32F4 Device Family Pack (DFP):** `Keil.STM32F4xx_DFP` installed in Keil Pack Installer.
-3. **ST-LINK v2 Programmer / Debugger** (with ST-LINK USB drivers).
+This guide provides step-by-step instructions to create a fresh Keil uVision 5 project, compile the bare-metal CMSIS firmware, wire the breadboard hardware, and run benchtop testing for the **Predictive Adaptive Smart Streetlight and Environmental Monitoring Network**.
 
 ---
 
-## 2. Creating a Fresh Project in Keil µVision 5
+## 1. Prerequisites and Toolchain
 
-1. Open **Keil µVision 5**.
-2. Click **Project** $\to$ **New µVision Project...**
-3. Choose a folder and name your project (e.g. `Smart_Streetlight`).
-4. **Select Device:** In the device selection dialog, search and select:
+1. **Keil MDK-ARM uVision 5** (v5.30 or newer).
+2. **STM32F4 Device Family Pack:** `Keil.STM32F4xx_DFP` installed via Keil Pack Installer.
+3. **ST-LINK v2 Programmer / In-Circuit Debugger** with ST-LINK USB drivers.
+4. **USB-UART or Bluetooth SPP Terminal** (e.g., PuTTY, Tera Term, or Serial Bluetooth Terminal on Android).
+
+---
+
+## 2. Keil uVision 5 Project Configuration
+
+### 2.1 Project Creation
+1. Open Keil uVision 5.
+2. Click **Project** -> **New uVision Project...**
+3. Select your project folder and specify project name: `Predictive_Streetlight`.
+4. In the target device selector, search and select:
+   ```text
+   STMicroelectronics -> STM32F4 Series -> STM32F401 -> STM32F401CCUx
    ```
-   STMicroelectronics -> STM32F4 Series -> STM32F401 -> STM32F401CCUx (or STM32F401CC)
-   ```
-   Click **OK**.
+5. Click **OK**.
 
----
-
-## 3. Configuring Keil RTE (Run-Time Environment)
-
-In the **Manage Run-Time Environment** window that pops up, you only need:
-
+### 2.2 Manage Run-Time Environment (RTE)
+In the software components window, select strictly minimal bare-metal components:
 1. **CMSIS:**
-   - Check $\checkmark$ **`CORE`**
+   - Check `CORE`
 2. **Device:**
-   - Check $\checkmark$ **`Startup`**
+   - Check `Startup`
+*(Do NOT select any STM32Cube HAL or middleware libraries. The code is 100% pure CMSIS bare-metal register C.)*
 
-*(Note: Because `main.c` is written in 100% pure CMSIS bare-metal register C, you do NOT need to check any HAL or CubeMX libraries!)*
+### 2.3 Adding Source File
+1. Under the Project workspace tree, expand `Target 1`.
+2. Right-click `Source Group 1` and click **Add Existing Files to Group...**
+3. Select `src/main.c` and click **Add**, then **Close**.
 
-3. Click **OK**.
-
----
-
-## 4. Adding `main.c` to the Project
-
-1. In the **Project / Target Tree** on the left, right-click **Source Group 1** (or create a new group called `User`).
-2. Click **Add Existing Files to Group...**
-3. Browse and select:
-   ```
-   src\main.c
-   ```
-4. Click **Add**, then click **Close**.
-
----
-
-## 5. Target Options Configuration (`Alt + F7`)
-
-1. Right-click **Target 1** $\to$ select **Options for Target 'Target 1'...** (or press `Alt + F7`).
-2. **Target Tab:**
+### 2.4 Target Options (`Alt + F7`)
+1. **Target Tab:**
    - **Xtal (MHz):** `16.0`
-   - **Floating Point Hardware:** *Single Precision*
-3. **Output Tab:**
-   - Check $\checkmark$ **`Create HEX File`** (if flashing with ST-Link Utility / STM32CubeProgrammer)
+   - **Floating Point Hardware:** `Single Precision`
+2. **Output Tab:**
+   - Check `Create HEX File`
+3. **Debug Tab:**
+   - Select `ST-Link Debugger`
+   - Click **Settings** -> Ensure SWD mode is selected and target MCU is detected.
 4. Click **OK**.
 
 ---
 
-## 6. Building the Project
+## 3. Comprehensive Breadboard Wiring Guide
 
-1. Click **Project** $\to$ **Rebuild all target files** (or press **F7**).
-2. The Build Output console will confirm:
-   ```text
-   linking...
-   Program Size: Code=... RO-data=... RW-data=... ZI-data=...
-   FromELF: creating hex file...
-   "Objects\Smart_Streetlight.hex" - 0 Error(s), 0 Warning(s).
-   ```
+### 3.1 Power Supply Distribution
+- Connect Black Pill `5V` pin to the breadboard high-voltage rail (supplies PIR sensors, buzzer, LCD backlight, and MAX485).
+- Connect Black Pill `3.3V` pin to the low-voltage rail (supplies BH1750, SHT31, LM35, and pushbuttons).
+- Connect Black Pill `GND` to the common ground rail.
+
+### 3.2 Subsystem Wiring Connections
+
+| Subsystem | Component Pin | STM32 Pin | Signal Type | External Components Required |
+| :--- | :--- | :--- | :--- | :--- |
+| **Streetlight S1** | Gate / Anode | `PA0` | TIM2_CH1 PWM | 220 Ω resistor to LED or N-MOSFET gate |
+| **Streetlight S2** | Gate / Anode | `PA6` | TIM3_CH1 PWM | 220 Ω resistor to LED or N-MOSFET gate |
+| **Streetlight S3** | Gate / Anode | `PA7` | TIM3_CH2 PWM | 220 Ω resistor to LED or N-MOSFET gate |
+| **LM35 Temp** | Vout (Pin 2) | `PA1` | ADC1_IN1 | Connect Vs to 3.3V, GND to rail |
+| **LDR Sensor** | Signal Out | `PA4` | ADC1_IN4 | Voltage divider with 10 kΩ pull-down |
+| **RS-485 Bus** | DI / RO / DE | `PA2`, `PA3`, `PB10` | USART2 + GPIO | MAX485 module (DI->PA2, RO->PA3, DE+RE->PB10) |
+| **Bluetooth** | RX / TX | `PA9`, `PA10` | USART1 | HC-05 module (RX->PA9, TX->PA10 via divider) |
+| **PIR-A (Motion)**| OUT | `PB0` | Digital Input | Powered by 5V, 3.3V digital logic output |
+| **PIR-B (Motion)**| OUT | `PB1` | Digital Input | Powered by 5V, 3.3V digital logic output |
+| **I2C Bus** | SCL / SDA | `PB8`, `PB9` | I2C1 Open-Drain | 4.7 kΩ pull-up resistors to 3.3V on bus |
+| **Buzzer** | Positive (+) | `PB12` | Digital Output | Active 3.3V/5V buzzer, negative to GND |
+| **RGB Status** | R / G / B | `PB13`, `PB14`, `PB15`| Digital Output | 3x 330 Ω resistors to common cathode RGB |
+| **Button UP** | Switch Pin | `PA5` | Digital Input | Momentary switch to GND, internal pull-up |
+| **Button DOWN** | Switch Pin | `PA8` | Digital Input | Momentary switch to GND, internal pull-up |
 
 ---
 
-## 7. Flashing & Hardware Verification
+## 4. Benchtop Demonstration and Test Procedures
 
-1. **Hardware Connections:**
-   - Connect your **ST-LINK v2** programmer to the STM32F401 board (`SWDIO`, `SWCLK`, `3.3V`, `GND`).
-   - Wire the **LM35** output to `PA1` and **LDR** voltage divider to `PA2`.
-   - Wire the **Red Hazard LED** to `PA3` and **Streetlight LED** to `PA0` (TIM2 PWM).
-   - Wire the **HC-05 Bluetooth Module** (`TX` $\to$ `PA10`, `RX` $\to$ `PA9`).
-2. **Flash the MCU:** In Keil, click **Flash** $\to$ **Download** (or press `F8`).
-3. **Bluetooth Terminal Testing:**
-   - Pair your smartphone with the HC-05 module using any Serial Bluetooth Terminal app at **9600 Baud (8-N-1)**.
-   - Live telemetry packets will stream every 500 ms:
+### 4.1 Initial Power-Up and Calibration
+1. Flash firmware via ST-LINK (`F8` in Keil uVision).
+2. The onboard LED on `PC13` begins blinking as a 1 Hz heartbeat.
+3. The 16x2 I2C LCD initializes and displays:
+   ```text
+   SMART STREETLIGHT
+   INITIALIZING...
+   ```
+4. After 1 second, the LCD starts alternating between:
+   - **Page 1 (Environment):** Temperature, Humidity, and Ambient Lux.
+   - **Page 2 (Lighting Network):** State, Vector Direction, and S1/S2/S3 PWM levels.
+
+### 4.2 Interactive Verification Scenarios
+
+1. **Ambient Lighting Verification:**
+   - Cover the BH1750/LDR sensor: Ambient reading drops below 30 Lux. Streetlights S1, S2, and S3 ramp to the baseline 20% idle state.
+   - Expose the sensors to ambient room light: Readings rise above 50 Lux. Streetlights automatically extinguish (0% daylight shutoff).
+
+2. **Moving Corridor Transit Verification:**
+   - While in night idle mode, swipe your hand from **PIR-A toward PIR-B**:
+     - System registers forward approach vector (`DIR: FWD`).
+     - Streetlight S1 and S2 immediately jump to 100% full illumination.
+     - Streetlight S3 illuminates to 50% as a predictive pre-lit safety buffer.
+     - RGB status LED illuminates Blue.
+     - After 3 seconds without motion, S1 decays to 20%, followed by S2 and S3 returning to idle.
+   - Swipe from **PIR-B toward PIR-A**:
+     - System registers reverse approach vector (`DIR: REV`) with reverse corridor progression.
+
+3. **Adverse Weather Trigger Verification:**
+   - Gently exhale on the SHT31 sensor to increase localized humidity above 80% RH.
+   - The decision engine automatically boosts the idle baseline across all streetlights from 20% to 50% for fog/rain visibility.
+   - RGB status LED switches to Yellow.
+
+4. **Thermal Roadside Hazard Alarm:**
+   - Warm the LM35 sensor slightly until the reading exceeds 40 °C.
+   - The active buzzer sounds an alert, and the RGB status LED flashes Red.
+
+5. **Technician Serial Command Terminal:**
+   - Connect via Bluetooth terminal at 9600 Baud (8-N-1) to view real-time telemetry frames:
      ```text
-     Temp:28C | Warn LED:OFF | Lights PWM:0
+     [NODE1] T_LM:31C T_SHT:31.4C H:65% LUX:18lx DIR:FWD S1:100% S2:100% S3:50% STAT:ADAPT
      ```
-   - Send wireless commands from your phone:
-     - `'U'` or `'+'` $\implies$ Step Streetlight brightness **UP** (+5%).
-     - `'D'` or `'-'` $\implies$ Step Streetlight brightness **DOWN** (-5%).
-     - `'A'` $\implies$ Enable **Auto Photocell Mode** (LDR sensor control).
-     - `'1'` $\implies$ Force **100% Full Illumination**.
-     - `'0'` $\implies$ Turn **OFF** luminaire.
+   - Send single-byte wireless commands:
+     - `'F'` -> Simulates forward vehicle corridor transit.
+     - `'R'` -> Simulates reverse vehicle corridor transit.
+     - `'U'` / `'+'` -> Steps brightness UP by 5% and engages manual mode.
+     - `'D'` / `'-'` -> Steps brightness DOWN by 5% and engages manual mode.
+     - `'A'` -> Re-arms automatic adaptive corridor mode.
+     - `'1'` -> Emergency full 100% illumination override.
+     - `'0'` -> Emergency blackout 0% shutdown.
