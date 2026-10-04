@@ -1,6 +1,6 @@
 # Keil uVision 5 Setup and Hardware Demonstration Guide
 
-This guide provides step-by-step instructions to create a fresh Keil uVision 5 project, compile the bare-metal CMSIS firmware, wire the breadboard hardware, and run benchtop testing for the **Predictive Adaptive Smart Streetlight and Environmental Monitoring Network**.
+This guide provides step-by-step instructions to create a fresh Keil uVision 5 project, compile the bare-metal CMSIS firmware, wire the breadboard hardware, and run benchtop testing for the **Predictive Adaptive Smart Streetlight and Environmental Monitoring System**.
 
 ---
 
@@ -18,7 +18,7 @@ This guide provides step-by-step instructions to create a fresh Keil uVision 5 p
 ### 2.1 Project Creation
 1. Open Keil uVision 5.
 2. Click **Project** -> **New uVision Project...**
-3. Select your project folder and specify project name: `Predictive_Streetlight`.
+3. Name your project: `Predictive_Streetlight`.
 4. In the target device selector, search and select:
    ```text
    STMicroelectronics -> STM32F4 Series -> STM32F401 -> STM32F401CCUx
@@ -45,89 +45,87 @@ In the software components window, select strictly minimal bare-metal components
 2. **Output Tab:**
    - Check `Create HEX File`
 3. **Debug Tab:**
-   - Select `ST-Link Debugger`
-   - Click **Settings** -> Ensure SWD mode is selected and target MCU is detected.
+   - Select `ST-Link Debugger` -> Click **Settings** -> Ensure SWD mode is selected.
 4. Click **OK**.
 
 ---
 
-## 3. Comprehensive Breadboard Wiring Guide
+## 3. Hardware Connections & Breadboard Setup
 
 ### 3.1 Power Supply Distribution
-- Connect Black Pill `5V` pin to the breadboard high-voltage rail (supplies PIR sensors, buzzer, LCD backlight, and MAX485).
-- Connect Black Pill `3.3V` pin to the low-voltage rail (supplies BH1750, SHT31, LM35, and pushbuttons).
+- Connect Black Pill `5V` pin to the breadboard high-voltage rail (supplies PIR sensors, LM35, buzzer, LCD backlight).
+- Connect Black Pill `3.3V` pin to the low-voltage rail (supplies BH1750, SHT31, and pull-up resistors).
 - Connect Black Pill `GND` to the common ground rail.
 
-### 3.2 Subsystem Wiring Connections
+### 3.2 Subsystem Pin Mapping
 
 | Subsystem | Component Pin | STM32 Pin | Signal Type | External Components Required |
 | :--- | :--- | :--- | :--- | :--- |
-| **Streetlight S1** | Gate / Anode | `PA0` | TIM2_CH1 PWM | 220 Ω resistor to LED or N-MOSFET gate |
+| **MODE Button** | Onboard KEY | `PA0` | Digital Input | Internal pull-up (active LOW) |
+| **LM35 Pavement** | Vout (Pin 2) | `PA1` | ADC1_IN1 | Connect Vs to 5V, GND to rail |
+| **Streetlight S1** | Gate / Anode | `PA2` | TIM2_CH3 PWM | 220 Ω resistor to LED or N-MOSFET gate |
+| **LDR Feedback** | Signal Out | `PA4` | ADC1_IN4 | 10 kΩ divider, inside tube aimed at S2 |
+| **Button UP** | Switch Pin | `PA5` | Digital Input | Momentary switch to GND, internal pull-up |
 | **Streetlight S2** | Gate / Anode | `PA6` | TIM3_CH1 PWM | 220 Ω resistor to LED or N-MOSFET gate |
 | **Streetlight S3** | Gate / Anode | `PA7` | TIM3_CH2 PWM | 220 Ω resistor to LED or N-MOSFET gate |
-| **LM35 Temp** | Vout (Pin 2) | `PA1` | ADC1_IN1 | Connect Vs to 3.3V, GND to rail |
-| **LDR Sensor** | Signal Out | `PA4` | ADC1_IN4 | Voltage divider with 10 kΩ pull-down |
-| **RS-485 Bus** | DI / RO / DE | `PA2`, `PA3`, `PB10` | USART2 + GPIO | MAX485 module (DI->PA2, RO->PA3, DE+RE->PB10) |
-| **Bluetooth** | RX / TX | `PA9`, `PA10` | USART1 | HC-05 module (RX->PA9, TX->PA10 via divider) |
-| **PIR-A (Motion)**| OUT | `PB0` | Digital Input | Powered by 5V, 3.3V digital logic output |
-| **PIR-B (Motion)**| OUT | `PB1` | Digital Input | Powered by 5V, 3.3V digital logic output |
-| **I2C Bus** | SCL / SDA | `PB8`, `PB9` | I2C1 Open-Drain | 4.7 kΩ pull-up resistors to 3.3V on bus |
-| **Buzzer** | Positive (+) | `PB12` | Digital Output | Active 3.3V/5V buzzer, negative to GND |
-| **RGB Status** | R / G / B | `PB13`, `PB14`, `PB15`| Digital Output | 3x 330 Ω resistors to common cathode RGB |
-| **Button UP** | Switch Pin | `PA5` | Digital Input | Momentary switch to GND, internal pull-up |
 | **Button DOWN** | Switch Pin | `PA8` | Digital Input | Momentary switch to GND, internal pull-up |
+| **Bluetooth TX** | RX Pin | `PA9` | USART1_TX | Connect to HC-05 RX via resistor divider |
+| **Bluetooth RX** | TX Pin | `PA10` | USART1_RX | Connect directly to HC-05 TX |
+| **PIR-A (Zone 1)**| OUT Pin | `PB0` | EXTI0 (Int) | Powered by 5V, output to PB0 with tube |
+| **PIR-B (Zone 3)**| OUT Pin | `PB1` | EXTI1 (Int) | Powered by 5V, output to PB1 with tube |
+| **I2C Bus Clock** | SCL Pin | `PB8` | I2C1_SCL | 4.7 kΩ pull-up to 3.3V on bus |
+| **I2C Bus Data** | SDA Pin | `PB9` | I2C1_SDA | 4.7 kΩ pull-up to 3.3V on bus |
+| **Buzzer** | Positive (+) | `PB12` | Digital Output | Active buzzer, negative to GND |
+| **RGB Status** | R / G / B | `PB13`, `PB14`, `PB15`| Digital Output | 3x 330 Ω resistors to common cathode RGB |
+| **Heartbeat LED** | Onboard LED | `PC13` | Digital Output | Onboard active-low LED |
+
+### 3.3 Optical Isolation & Collimation Tips
+1. **PIR Field of View:** Place a 5 cm black heat-shrink or cardboard tube around PIR-A and PIR-B domes to narrow detection cones to $30^\circ$, preventing cross-triggering.
+2. **BH1750 Shielding:** Position the BH1750 ambient sensor facing away from or shielded from Streetlights S1, S2, and S3 to prevent optical feedback oscillation.
 
 ---
 
 ## 4. Benchtop Demonstration and Test Procedures
 
-### 4.1 Initial Power-Up and Calibration
+### 4.1 Initial Power-Up (45s Warm-up)
 1. Flash firmware via ST-LINK (`F8` in Keil uVision).
 2. The onboard LED on `PC13` begins blinking as a 1 Hz heartbeat.
-3. The 16x2 I2C LCD initializes and displays:
+3. The 16x2 LCD initializes and displays a 45-second PIR sensor stabilization countdown:
    ```text
-   SMART STREETLIGHT
-   INITIALIZING...
+   SMART STREETLGT
+   PIR WARMUP: 42s
    ```
-4. After 1 second, the LCD starts alternating between:
-   - **Page 1 (Environment):** Temperature, Humidity, and Ambient Lux.
-   - **Page 2 (Lighting Network):** State, Vector Direction, and S1/S2/S3 PWM levels.
 
 ### 4.2 Interactive Verification Scenarios
 
-1. **Ambient Lighting Verification:**
-   - Cover the BH1750/LDR sensor: Ambient reading drops below 30 Lux. Streetlights S1, S2, and S3 ramp to the baseline 20% idle state.
-   - Expose the sensors to ambient room light: Readings rise above 50 Lux. Streetlights automatically extinguish (0% daylight shutoff).
+1. **Daylight Mode (0:00 - 0:30):**
+   - Expose BH1750 to ambient room light (> 50 Lux).
+   - LCD displays `DAYLIGHT | LUX: 120 lx`.
+   - All three streetlights remain completely off (0%).
 
-2. **Moving Corridor Transit Verification:**
-   - While in night idle mode, swipe your hand from **PIR-A toward PIR-B**:
-     - System registers forward approach vector (`DIR: FWD`).
-     - Streetlight S1 and S2 immediately jump to 100% full illumination.
-     - Streetlight S3 illuminates to 50% as a predictive pre-lit safety buffer.
-     - RGB status LED illuminates Blue.
-     - After 3 seconds without motion, S1 decays to 20%, followed by S2 and S3 returning to idle.
-   - Swipe from **PIR-B toward PIR-A**:
-     - System registers reverse approach vector (`DIR: REV`) with reverse corridor progression.
+2. **Clear Night Baseline (0:30 - 1:00):**
+   - Cover BH1750 with a dark cap (< 20 Lux).
+   - Streetlights S1, S2, and S3 smoothly fade up to the idle baseline (8% perceptual / 20% PWM).
+   - RGB status LED illuminates solid Green.
 
-3. **Adverse Weather Trigger Verification:**
-   - Gently exhale on the SHT31 sensor to increase localized humidity above 80% RH.
-   - The decision engine automatically boosts the idle baseline across all streetlights from 20% to 50% for fog/rain visibility.
+3. **Forward Moving Corridor (1:00 - 1:30):**
+   - Slowly swipe hand past PIR-A toward PIR-B ($t_A \to t_B$).
+   - S1 and S2 ramp to 100% full brightness; S3 pre-lights to 60%.
+   - RGB LED switches to Blue; Buzzer gives a confirmation chirp.
+   - S1 fades to baseline while S2 and S3 hold at 100%, followed by sequential decay back to idle.
+
+4. **Reverse Moving Corridor (1:30 - 2:00):**
+   - Swipe hand past PIR-B toward PIR-A ($t_B \to t_A$).
+   - System mirrors the wave in reverse: S3 and S2 illuminate to 100%, and S1 pre-lights.
+
+5. **Adverse Weather Response (2:00 - 2:30):**
+   - Gently exhale on the SHT31 sensor (humidity rises above 88% RH, reducing dew point spread).
+   - LCD displays `NIGHT WET`, and the baseline brightness elevates across all nodes to 25% perceptual.
    - RGB status LED switches to Yellow.
 
-4. **Frost and Black Ice Hazard Alarm:**
-   - Apply cold ice or a cooling element to the LM35 sensor until the temperature drops to 3 °C or lower.
-   - The system detects the roadside freezing hazard, triggers a warning chirp on the active buzzer, switches the RGB status LED to Red, and elevates streetlight illumination across all nodes to 100% for driver safety.
+6. **Frost and Black Ice Hazard (2:30 - 2:45):**
+   - Touch an ice pack to the LM35 sensor ($\le 3.0^\circ\text{C}$).
+   - LCD displays `FROST RISK`, RGB flashes Red, and hold times extend for road safety.
 
-5. **Technician Serial Command Terminal:**
-   - Connect via Bluetooth terminal at 9600 Baud (8-N-1) to view real-time telemetry frames:
-     ```text
-     [NODE1] T_LM:2C T_SHT:2.8C H:82% LUX:18lx DIR:FWD S1:100% S2:100% S3:100% STAT:FROST
-     ```
-   - Send single-byte wireless commands:
-     - `'F'` -> Simulates forward vehicle corridor transit.
-     - `'R'` -> Simulates reverse vehicle corridor transit.
-     - `'U'` / `'+'` -> Steps brightness UP by 5% and engages manual mode.
-     - `'D'` / `'-'` -> Steps brightness DOWN by 5% and engages manual mode.
-     - `'A'` -> Re-arms automatic adaptive corridor mode.
-     - `'1'` -> Emergency full 100% illumination override.
-     - `'0'` -> Emergency blackout 0% shutdown.
+7. **Closed-Loop Lamp Feedback Test:**
+   - Disconnect the LED at S2 while commanded ON; the system flags `LAMP2_FAULT` on the LCD and Bluetooth console.
