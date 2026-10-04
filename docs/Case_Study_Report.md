@@ -165,5 +165,5 @@ T3 (Target Clears Corridor):
    When Streetlight S2 is commanded to $\ge 80\%$, the LDR on `PA4` is sampled. If measured light remains low, the system flags `LAMP2_FAULT` on the LCD and telemetry without disrupting adaptive operation.
 2. **Fail-Bright Optical Architecture:**  
    If the BH1750 sensor disconnects or NACKs on I2C1, the system defaults to night mode rather than failing dark, ensuring road safety.
-3. **PIR Sensor Blanking & Crosstalk Isolation:**  
-   EXTI ISRs reject events for the first 45 seconds after boot while HC-SR501 sensors stabilize. Collimation tubes restrict each sensor's conical angle to $30^\circ$, preventing false reverse triggers.
+3. **PIR Sensor Blanking & Spatial Collimation:**  
+   EXTI ISRs reject events for the first 45 seconds after boot while HC-SR501 sensors stabilize. Because the HC-SR501 possesses a wide native 110° Field of View (FOV), placing two sensors in close proximity on a breadboard causes optical overlap; rolling a small paper tube around each dome restricts the FOV to approximately 30°, eliminating crosstalk and ensuring distinct directional edge sequencing.
